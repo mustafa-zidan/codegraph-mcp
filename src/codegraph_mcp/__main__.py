@@ -81,7 +81,8 @@ def _run_serve(repo: Path, db_path: str, transport: str, port: int) -> None:
 
     if transport == "sse":
         # Platforms like Railway/Fly inject PORT
-        os.environ["PORT"] = str(port)
+        os.environ["FASTMCP_HOST"] = "0.0.0.0"      # bind to all interfaces
+        os.environ["FASTMCP_PORT"] = str(port)       # use Railway's $PORT
 
     # Let FastMCP handle server startup
     mcp.run(transport=transport)
