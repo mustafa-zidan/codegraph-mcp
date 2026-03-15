@@ -75,26 +75,13 @@ def _run_analyze(repo: Path, db_path: str) -> None:
 
 def _run_serve(repo: Path, db_path: str, transport: str, port: int) -> None:
     from .server.mcp_server import initialize, mcp
-    import uvicorn
 
-    
+    # Build or load the graph
     initialize(str(repo), db_path)
 
     if transport == "sse":
-        
+        # Platforms like Railway/Fly inject PORT
         os.environ["PORT"] = str(port)
 
-        
-        uvicorn.run(
-            mcp.app,
-            host="0.0.0.0",
-            port=port,
-            log_level="info",
-        )
-    else:
-        
-        mcp.run(transport="stdio")
-
-
-if __name__ == "__main__":
-    main()
+    # Let FastMCP handle server startup
+    mcp.run(transport=transport)
