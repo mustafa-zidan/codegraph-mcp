@@ -1552,26 +1552,6 @@ class TestSQLiteStore:
             store.close()
 </file>
 
-<file path="Dockerfile">
-FROM python:3.11-slim
-
-WORKDIR /app
-
-COPY pyproject.toml README.md LICENSE ./
-COPY src/ src/
-COPY sample_repo/ sample_repo/
-
-RUN pip install --no-cache-dir .
-
-ENV REPO_PATH=/app
-ENV PORT=8080
-ENV MCP_TRANSPORT=sse
-
-EXPOSE 8080
-
-CMD ["python", "-m", "codegraph_mcp", "serve", "/app", "--transport", "sse"]
-</file>
-
 <file path="pyproject.toml">
 [build-system]
 requires = ["setuptools>=68.0", "wheel"]
@@ -1606,6 +1586,26 @@ codegraph-mcp = "codegraph_mcp.__main__:main"
 where = ["src"]
 </file>
 
+<file path="Dockerfile">
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY pyproject.toml README.md LICENSE ./
+COPY src/ src/
+COPY sample_repo/ sample_repo/
+
+RUN pip install --no-cache-dir .
+
+ENV REPO_PATH=/app
+ENV PORT=8080
+ENV MCP_TRANSPORT=streamable-http
+
+EXPOSE 8080
+
+CMD ["python", "-m", "codegraph_mcp", "serve", "/app", "--transport", "streamable-http"]
+</file>
+
 <file path="README.md">
 # CodeGraph MCP
 
@@ -1628,7 +1628,7 @@ SQLite Storage (persistent, indexed)
    ↓
 Query Engine (BFS, DFS, shortest path, impact analysis)
    ↓
-MCP Server (FastMCP — stdio or SSE transport)
+MCP Server (FastMCP — stdio, sse, or streamable-http transport)
    ↓
 AI Agent (Cursor, Windsurf, Claude Code, etc.)
 ```
@@ -1660,7 +1660,7 @@ codegraph-mcp serve ./your-repo
 ### Start MCP server (remote — SSE)
 
 ```bash
-codegraph-mcp serve ./your-repo --transport sse --port 8080
+codegraph-mcp serve ./your-repo --transport streamable-http --port 8080
 ```
 
 ## MCP Configuration
@@ -1678,13 +1678,13 @@ Add to your MCP client config (e.g. `claude_desktop_config.json`):
 }
 ```
 
-For remote SSE servers:
+For remote servers (streamable-http or sse):
 
 ```json
 {
   "mcpServers": {
     "codegraph": {
-      "url": "http://your-server:8080/sse"
+      "url": "http://your-server:8080/mcp"
     }
   }
 }
@@ -1743,7 +1743,7 @@ fly deploy
 |----------|---------|-------------|
 | `REPO_PATH` | `.` | Path to the repository to analyze |
 | `PORT` | `8080` | Port for SSE transport |
-| `MCP_TRANSPORT` | `stdio` | Transport mode: `stdio` or `sse` |
+| `MCP_TRANSPORT` | `stdio` | Transport mode: `stdio`, `sse`, or `streamable-http` |
 
 ## Development
 
@@ -1765,8 +1765,8 @@ MIT — see [LICENSE](LICENSE).
     "dockerfilePath": "Dockerfile"
   },
   "deploy": {
-    "startCommand": "python -m codegraph_mcp serve --transport sse",
-    "healthcheckPath": "/health",
+    "startCommand": "python -m codegraph_mcp serve --transport streamable-http",
+    "healthcheckPath": "/mcp",
     "restartPolicyType": "ON_FAILURE"
   }
 }
@@ -1800,7 +1800,7 @@ _builder: GraphBuilder | None = None
 _engine: QueryEngine | None = None
 _store: SQLiteStore | None = None
 
-mcp = FastMCP("CodeGraph MCP")
+mcp = FastMCP("CodeGraph MCP", host="0.0.0.0", port=int(os.environ.get("FASTMCP_PORT", os.environ.get("PORT", "8080"))))
 
 @mcp.custom_route("/health", methods=["GET"])
 async def health(request):
@@ -1970,8 +1970,8 @@ def main(argv: list[str] | None = None) -> None:
                          help="SQLite database path")
     p_serve.add_argument("--transport", type=str,
                          default=os.environ.get("MCP_TRANSPORT", "stdio"),
-                         choices=["stdio", "sse"],
-                         help="MCP transport: stdio (local) or sse (remote)")
+                         choices=["stdio", "sse", "streamable-http"],
+                         help="MCP transport: stdio (local), sse, or streamable-http (remote)")
     p_serve.add_argument("--port", type=int,
                          default=int(os.environ.get("PORT", "8080")),
                          help="Port for SSE transport")
@@ -2004,9 +2004,8 @@ def _run_serve(repo: Path, db_path: str, transport: str, port: int) -> None:
     # Build or load the graph
     initialize(str(repo), db_path)
 
-    if transport == "sse":
-        # Platforms like Railway/Fly inject PORT
-        os.environ["PORT"] = str(port)
+    os.environ["PORT"] = str(port)
+    os.environ["FASTMCP_PORT"] = str(port)
 
     # Let FastMCP handle server startup
     mcp.run(transport=transport)
