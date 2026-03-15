@@ -1,8 +1,8 @@
-# Cartograph MCP
+# CodeGraph MCP
 
 **An MCP server that builds a machine-readable knowledge graph of your codebase.**
 
-Cartograph MCP scans a repository, parses source files with [Tree-sitter](https://tree-sitter.github.io/), and exposes structured architectural queries via the [Model Context Protocol](https://modelcontextprotocol.io/) — enabling AI coding agents to reason about dependencies, impact analysis, and system architecture.
+CodeGraph MCP scans a repository, parses source files with [Tree-sitter](https://tree-sitter.github.io/), and exposes structured architectural queries via the [Model Context Protocol](https://modelcontextprotocol.io/) — enabling AI coding agents to reason about dependencies, impact analysis, and system architecture.
 
 ## Architecture
 
@@ -27,8 +27,8 @@ AI Agent (Cursor, Windsurf, Claude Code, etc.)
 ## Installation
 
 ```bash
-git clone https://github.com/MrHappy439/cartograph-mcp.git
-cd cartograph-mcp
+git clone https://github.com/MrHappy439/codegraph-mcp.git
+cd codegraph-mcp
 pip install -e .
 ```
 
@@ -111,8 +111,8 @@ architecture_summary()
 ### Docker
 
 ```bash
-docker build -t cartograph-mcp .
-docker run -p 8080:8080 -v /path/to/repo:/repo cartograph-mcp
+docker build -t codegraph-mcp .
+docker run -p 8080:8080 -v /path/to/repo:/repo codegraph-mcp
 ```
 
 ### Railway
