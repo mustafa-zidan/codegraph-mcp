@@ -27,6 +27,11 @@ _store: SQLiteStore | None = None
 
 mcp = FastMCP("CodeGraph MCP")
 
+@mcp.custom_route("/health", methods=["GET"])
+async def health(request):
+    from starlette.responses import JSONResponse
+    return JSONResponse({"status": "ok"})
+
 
 def initialize(repo_path: str, db_path: str = "codegraph.db") -> None:
     """Build (or reload) the graph for *repo_path*.

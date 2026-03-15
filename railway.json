@@ -6,7 +6,7 @@
   },
   "deploy": {
     "startCommand": "python -m codegraph_mcp serve --transport sse",
-    "healthcheckPath": "/sse",
+    "healthcheckPath": "/health",
     "restartPolicyType": "ON_FAILURE"
   }
 }
