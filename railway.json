@@ -6,7 +6,6 @@
   },
   "deploy": {
     "startCommand": "python -m codegraph_mcp serve --transport streamable-http",
-    "healthcheckPath": "/mcp",
     "restartPolicyType": "ON_FAILURE"
   }
 }
