@@ -75,23 +75,24 @@ def _run_analyze(repo: Path, db_path: str) -> None:
 
 def _run_serve(repo: Path, db_path: str, transport: str, port: int) -> None:
     from .server.mcp_server import initialize, mcp
-
-    initialize(str(repo), db_path)
-
-    import os
-
     import uvicorn
 
+    
+    initialize(str(repo), db_path)
+
     if transport == "sse":
+        
         os.environ["PORT"] = str(port)
 
+        
         uvicorn.run(
-            "codegraph_mcp.server.mcp_server:mcp",
+            mcp.app,
             host="0.0.0.0",
             port=port,
-            factory=False,
+            log_level="info",
         )
     else:
+        
         mcp.run(transport="stdio")
 
 
