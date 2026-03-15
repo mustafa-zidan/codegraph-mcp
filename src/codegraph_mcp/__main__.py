@@ -80,9 +80,17 @@ def _run_serve(repo: Path, db_path: str, transport: str, port: int) -> None:
 
     import os
 
+    import uvicorn
+
     if transport == "sse":
         os.environ["PORT"] = str(port)
-        mcp.run(transport="sse")
+
+        uvicorn.run(
+            "codegraph_mcp.server.mcp_server:mcp",
+            host="0.0.0.0",
+            port=port,
+            factory=False,
+        )
     else:
         mcp.run(transport="stdio")
 
