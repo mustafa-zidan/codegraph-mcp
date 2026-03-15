@@ -79,7 +79,7 @@ def _run_serve(repo: Path, db_path: str, transport: str, port: int) -> None:
     initialize(str(repo), db_path)
 
     if transport == "sse":
-        mcp.run(transport="sse", host="0.0.0.0", port=port)
+        mcp.run(transport="sse", port=port)
     else:
         mcp.run(transport="stdio")
 
