@@ -45,8 +45,8 @@ def main(argv: list[str] | None = None) -> None:
                          help="SQLite database path")
     p_serve.add_argument("--transport", type=str,
                          default=os.environ.get("MCP_TRANSPORT", "stdio"),
-                         choices=["stdio", "sse"],
-                         help="MCP transport: stdio (local) or sse (remote)")
+                         choices=["stdio", "sse", "streamable-http"],
+                         help="MCP transport: stdio (local), sse, or streamable-http (remote)")
     p_serve.add_argument("--port", type=int,
                          default=int(os.environ.get("PORT", "8080")),
                          help="Port for SSE transport")
@@ -79,10 +79,8 @@ def _run_serve(repo: Path, db_path: str, transport: str, port: int) -> None:
     # Build or load the graph
     initialize(str(repo), db_path)
 
-    if transport == "sse":
-        # Platforms like Railway/Fly inject PORT
-        os.environ["FASTMCP_HOST"] = "0.0.0.0"      # bind to all interfaces
-        os.environ["FASTMCP_PORT"] = str(port)       # use Railway's $PORT
+    os.environ["PORT"] = str(port)
+    os.environ["FASTMCP_PORT"] = str(port)
 
     # Let FastMCP handle server startup
     mcp.run(transport=transport)

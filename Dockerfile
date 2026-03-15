@@ -10,8 +10,8 @@ RUN pip install --no-cache-dir .
 
 ENV REPO_PATH=/app
 ENV PORT=8080
-ENV MCP_TRANSPORT=sse
+ENV MCP_TRANSPORT=streamable-http
 
 EXPOSE 8080
 
-CMD ["python", "-m", "codegraph_mcp", "serve", "/app", "--transport", "sse"]
+CMD ["python", "-m", "codegraph_mcp", "serve", "/app", "--transport", "streamable-http"]

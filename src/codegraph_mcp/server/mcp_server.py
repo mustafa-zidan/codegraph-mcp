@@ -25,7 +25,7 @@ _builder: GraphBuilder | None = None
 _engine: QueryEngine | None = None
 _store: SQLiteStore | None = None
 
-mcp = FastMCP("CodeGraph MCP")
+mcp = FastMCP("CodeGraph MCP", host="0.0.0.0", port=int(os.environ.get("FASTMCP_PORT", os.environ.get("PORT", "8080"))))
 
 @mcp.custom_route("/health", methods=["GET"])
 async def health(request):

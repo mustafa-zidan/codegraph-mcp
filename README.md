@@ -19,7 +19,7 @@ SQLite Storage (persistent, indexed)
    ↓
 Query Engine (BFS, DFS, shortest path, impact analysis)
    ↓
-MCP Server (FastMCP — stdio or SSE transport)
+MCP Server (FastMCP — stdio, sse, or streamable-http transport)
    ↓
 AI Agent (Cursor, Windsurf, Claude Code, etc.)
 ```
@@ -51,7 +51,7 @@ codegraph-mcp serve ./your-repo
 ### Start MCP server (remote — SSE)
 
 ```bash
-codegraph-mcp serve ./your-repo --transport sse --port 8080
+codegraph-mcp serve ./your-repo --transport streamable-http --port 8080
 ```
 
 ## MCP Configuration
@@ -69,13 +69,13 @@ Add to your MCP client config (e.g. `claude_desktop_config.json`):
 }
 ```
 
-For remote SSE servers:
+For remote servers (streamable-http or sse):
 
 ```json
 {
   "mcpServers": {
     "codegraph": {
-      "url": "http://your-server:8080/sse"
+      "url": "http://your-server:8080/mcp"
     }
   }
 }
@@ -134,7 +134,7 @@ fly deploy
 |----------|---------|-------------|
 | `REPO_PATH` | `.` | Path to the repository to analyze |
 | `PORT` | `8080` | Port for SSE transport |
-| `MCP_TRANSPORT` | `stdio` | Transport mode: `stdio` or `sse` |
+| `MCP_TRANSPORT` | `stdio` | Transport mode: `stdio`, `sse`, or `streamable-http` |
 
 ## Development
 
