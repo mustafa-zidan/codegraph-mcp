@@ -2,7 +2,9 @@
 
 **An MCP server that builds a machine-readable knowledge graph of your codebase.**
 
-CodeGraph MCP scans a repository, parses source files with [Tree-sitter](https://tree-sitter.github.io/), and exposes structured architectural queries via the [Model Context Protocol](https://modelcontextprotocol.io/) — enabling AI coding agents to reason about dependencies, impact analysis, and system architecture.
+CodeGraph MCP scans a repository, parses source files with [Tree-sitter](https://tree-sitter.github.io/), and exposes
+structured architectural queries via the [Model Context Protocol](https://modelcontextprotocol.io/) — enabling AI coding
+agents to reason about dependencies, impact analysis, and system architecture.
 
 ## Architecture
 
@@ -96,14 +98,14 @@ For remote servers (streamable-http or sse):
 
 ## MCP Tools
 
-| Tool | Description |
-|------|-------------|
-| `search_nodes` | Find nodes by name or type |
-| `trace_dependencies` | What does this node depend on? |
-| `trace_dependents` | What depends on this node? |
-| `impact_analysis` | What breaks if this node changes? |
-| `trace_path` | Shortest path between two nodes |
-| `architecture_summary` | High-level graph summary |
+| Tool                   | Description                       |
+| ---------------------- | --------------------------------- |
+| `search_nodes`         | Find nodes by name or type        |
+| `trace_dependencies`   | What does this node depend on?    |
+| `trace_dependents`     | What depends on this node?        |
+| `impact_analysis`      | What breaks if this node changes? |
+| `trace_path`           | Shortest path between two nodes   |
+| `architecture_summary` | High-level graph summary          |
 
 ### Example queries
 
@@ -144,12 +146,12 @@ fly deploy
 
 ## Environment Variables
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `REPO_PATH` | `.` | Path to the repository to analyze |
-| `PORT` | `8080` | Port for SSE transport |
-| `MCP_TRANSPORT` | `stdio` | Transport mode: `stdio`, `sse`, or `streamable-http` |
-| `GRAPH_UI` | unset | Set to `1` / `true` to enable `/graph` and `/api/graph` (same as `--graph-ui`; HTTP transports only) |
+| Variable        | Default | Description                                                                                          |
+| --------------- | ------- | ---------------------------------------------------------------------------------------------------- |
+| `REPO_PATH`     | `.`     | Path to the repository to analyze                                                                    |
+| `PORT`          | `8080`  | Port for SSE transport                                                                               |
+| `MCP_TRANSPORT` | `stdio` | Transport mode: `stdio`, `sse`, or `streamable-http`                                                 |
+| `GRAPH_UI`      | unset   | Set to `1` / `true` to enable `/graph` and `/api/graph` (same as `--graph-ui`; HTTP transports only) |
 
 ## Development
 
@@ -165,6 +167,13 @@ Lint and format:
 ```bash
 ruff check src tests
 ruff format src tests
+```
+
+Markdown (see [`.mdformat.toml`](.mdformat.toml); [GFM](https://github.github.com/gfm/) tables and wrapping):
+
+```bash
+mdformat README.md CHANGELOG.md docs/
+mdformat --check README.md CHANGELOG.md docs/
 ```
 
 Static typing:
@@ -188,16 +197,23 @@ pre-commit install
 
 ## CI and PyPI releases
 
-[`.github/workflows/test.yml`](.github/workflows/test.yml) runs on push/PR to `main`, `master`, or `develop`: `uv sync --extra dev`, Ruff, Mypy, and pytest (matrix: Ubuntu / macOS / Windows × Python 3.10 / 3.12 / 3.13).
+[`.github/workflows/test.yml`](.github/workflows/test.yml) runs on push/PR to `main`, `master`, or `develop`:
+`uv sync --extra dev`, Ruff, mdformat, Mypy, and pytest (matrix: Ubuntu / macOS / Windows × Python 3.10 / 3.12 / 3.13).
 
 To publish **[codegraph-mcp on PyPI](https://pypi.org/p/codegraph-mcp)**:
 
-1. Bump `version` in [`pyproject.toml`](pyproject.toml) and update [`CHANGELOG.md`](CHANGELOG.md) for that version, merge to your default branch.
-2. In PyPI → your project → **Settings** → **Publishing**, add a **trusted publisher** for this GitHub repo (workflow: `release.yml`, environment: `pypi`).
+1. Bump `version` in [`pyproject.toml`](pyproject.toml) and update [`CHANGELOG.md`](CHANGELOG.md) for that version,
+   merge to your default branch.
+2. In PyPI → your project → **Settings** → **Publishing**, add a **trusted publisher** for this GitHub repo (workflow:
+   `release.yml`, environment: `pypi`).
 3. In GitHub → **Settings** → **Environments**, create an environment named `pypi` (optionally add protection rules).
 4. Run **Actions** → **Release** → **Run workflow**, enter the same version string as in `pyproject.toml`.
 
-The workflow creates an annotated tag `vX.Y.Z`, runs `uv build`, publishes with [OIDC](https://docs.pypi.org/trusted-publishers/), signs artifacts with Sigstore, and creates a GitHub Release. Inspired by the [eurydice](https://github.com/mustafa-zidan/eurydice) test/release workflows.
+The workflow creates an annotated tag `vX.Y.Z`, runs `uv build`, publishes with
+[OIDC](https://docs.pypi.org/trusted-publishers/), signs artifacts with Sigstore, and creates a GitHub Release. Inspired
+by the [eurydice](https://github.com/mustafa-zidan/eurydice) test/release workflows.
+
+Full maintainer guide: [docs/release-cycle.md](docs/release-cycle.md).
 
 ## License
 

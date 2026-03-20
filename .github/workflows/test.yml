@@ -36,6 +36,9 @@ jobs:
           uv run ruff check --diff .
           uv run ruff format --check --diff .
 
+      - name: Check Markdown formatting
+        run: uv run mdformat --check README.md CHANGELOG.md docs/
+
       - name: Run mypy
         run: uv run mypy src
 
