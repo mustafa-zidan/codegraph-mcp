@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import time
 from collections import deque
+from typing import Protocol
 
 import networkx as nx
 
@@ -20,12 +21,34 @@ from codegraph_mcp.models import (
 logger = logging.getLogger("codegraph_mcp.graph.query_engine")
 
 
+class _SupportsFtsSearch(Protocol):
+    def search_nodes_fts(
+        self,
+        query: str,
+        node_type: NodeType | None,
+        limit: int,
+        node_by_id: dict[str, Node],
+    ) -> list[Node]: ...
+
+
 class QueryEngine:
     """Executes queries against a built NetworkX graph."""
 
-    def __init__(self, graph: nx.DiGraph, node_index: dict[str, Node] | None = None) -> None:
+    def __init__(
+        self,
+        graph: nx.DiGraph,
+        node_index: dict[str, Node] | None = None,
+        *,
+        fts_store: _SupportsFtsSearch | None = None,
+    ) -> None:
         self._g = graph
         self._nodes = node_index or {}
+        self._fts_store = fts_store
+
+    @property
+    def node_index(self) -> dict[str, Node]:
+        """Map of node id → :class:`Node` (for tools that need lookup after search)."""
+        return self._nodes
 
     # ------------------------------------------------------------------
     # MCP tool: search_nodes
@@ -37,8 +60,15 @@ class QueryEngine:
         node_type: NodeType | None = None,
         limit: int = 50,
     ) -> list[Node]:
-        """Return nodes whose name contains *query* (case-insensitive)."""
+        """FTS-ranked search when a store is configured; else substring on name/id."""
         start = time.perf_counter()
+        if self._fts_store is not None:
+            fts_matches = self._fts_store.search_nodes_fts(query, node_type, limit, self._nodes)
+            if fts_matches:
+                elapsed = time.perf_counter() - start
+                logger.info("search_nodes(%r) fts → %d results in %.3fs", query, len(fts_matches), elapsed)
+                return fts_matches
+
         query_lower = query.lower()
         matches: list[Node] = []
         for node in self._nodes.values():

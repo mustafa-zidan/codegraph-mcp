@@ -17,19 +17,27 @@ from codegraph_mcp.graph.builder import GraphBuilder
 from codegraph_mcp.graph.query_engine import QueryEngine
 from codegraph_mcp.logging_config import setup_logging
 from codegraph_mcp.models import GraphQuery
-from codegraph_mcp.storage.sqlite_store import SQLiteStore
+from codegraph_mcp.storage.kuzu_store import KuzuStore
 
 logger = logging.getLogger("codegraph_mcp.server")
+
+# Default HTTP port when PORT / FASTMCP_PORT are unset (avoid 8080 / 3000 collisions).
+DEFAULT_HTTP_PORT = 3847
 
 # ---------------------------------------------------------------------------
 # Global state (populated by `initialize`)
 # ---------------------------------------------------------------------------
 _builder: GraphBuilder | None = None
 _engine: QueryEngine | None = None
-_store: SQLiteStore | None = None
+_store: KuzuStore | None = None
+_store_path: str | None = None
 _graph_ui_routes_registered: bool = False
 
-mcp = FastMCP("CodeGraph MCP", host="0.0.0.0", port=int(os.environ.get("FASTMCP_PORT", os.environ.get("PORT", "8080"))))
+mcp = FastMCP(
+    "CodeGraph MCP",
+    host="0.0.0.0",
+    port=int(os.environ.get("FASTMCP_PORT", os.environ.get("PORT", str(DEFAULT_HTTP_PORT)))),
+)
 
 
 @mcp.custom_route("/health", methods=["GET"])
@@ -47,22 +55,40 @@ def _register_graph_ui_routes() -> None:
     def _graph_payload(limit: int) -> dict[str, Any]:
         if _builder is None:
             return {"nodes": [], "edges": [], "truncated": False, "error": "graph not initialized"}
-        nodes_all = _builder.all_nodes()
-        truncated = len(nodes_all) > limit
-        if truncated:
-            nodes_all = nodes_all[:limit]
-        allowed = {n.id for n in nodes_all}
-        nodes_out = [{"id": n.id, "label": n.name, "group": n.type.value} for n in nodes_all]
+        # Edges often connect a parsed node to a *stub* (endpoint added only in NetworkX for consistency).
+        # The old filter required both ends in all_nodes(), which dropped every edge touching a stub.
+        all_edges = _builder.all_edges()
+        max_nodes = max(1, min(int(limit), 50_000))
+        max_edges = max(500, min(max_nodes * 4, 20_000))
+
+        claimed: dict[str, dict[str, str]] = {}
         edges_out: list[dict] = []
-        for e in _builder.all_edges():
-            if e.source in allowed and e.target in allowed:
-                edges_out.append(
-                    {
-                        "from": e.source,
-                        "to": e.target,
-                        "title": e.type.value,
-                    }
-                )
+
+        def ensure(nid: str) -> bool:
+            if nid in claimed:
+                return True
+            if len(claimed) >= max_nodes:
+                return False
+            node = _builder.get_node(nid)
+            if node:
+                claimed[nid] = {"id": node.id, "label": node.name, "group": node.type.value}
+            else:
+                claimed[nid] = {"id": nid, "label": nid, "group": "default"}
+            return True
+
+        truncated = False
+        for e in all_edges:
+            if len(edges_out) >= max_edges:
+                truncated = True
+                break
+            if not ensure(e.source) or not ensure(e.target):
+                truncated = True
+                break
+            edges_out.append({"from": e.source, "to": e.target, "title": e.type.value})
+
+        nodes_out = list(claimed.values())
+        if len(edges_out) < len(all_edges):
+            truncated = True
         return {"nodes": nodes_out, "edges": edges_out, "truncated": truncated}
 
     @mcp.custom_route("/api/graph", methods=["GET"])
@@ -132,25 +158,25 @@ def _register_graph_ui_routes() -> None:
         return HTMLResponse(html)
 
 
-def initialize(repo_path: str, db_path: str = "codegraph.db", *, graph_ui: bool = False) -> None:
+def initialize(repo_path: str, store_path: str | None = None, *, graph_ui: bool = False) -> None:
     """Build (or reload) the graph for *repo_path*.
 
-    If a SQLite database already exists at *db_path*, the graph is loaded
-    from it instead of re-scanning the repository — making cold starts
-    near-instant for previously analyzed repos.
+    If a Kuzu database already exists at *store_path* with at least one node,
+    the graph is loaded from it instead of re-scanning the repository.
     """
-    global _builder, _engine, _store
+    global _builder, _engine, _store, _store_path
 
     setup_logging()
     logger.info("Initializing CodeGraph for %s", repo_path)
 
-    _store = SQLiteStore(db_path)
+    resolved = Path(store_path or os.environ.get("CODEGRAPH_STORE") or "codegraph.kuzu").resolve()
+    _store_path = str(resolved)
+    _store = KuzuStore(_store_path)
     _builder = GraphBuilder()
 
-    db_file = Path(db_path)
-    if db_file.exists() and db_file.stat().st_size > 0:
-        # ---------- fast path: load from SQLite ----------
-        logger.info("Found existing graph database — loading from %s", db_path)
+    if _store.node_count() > 0:
+        # ---------- fast path: load from Kuzu ----------
+        logger.info("Found existing graph store — loading from %s", _store_path)
         nodes = _store.load_nodes()
         edges = _store.load_edges()
         if nodes:
@@ -161,18 +187,25 @@ def initialize(repo_path: str, db_path: str = "codegraph.db", *, graph_ui: bool 
             result.edges = edges
             _builder.add_parse_result(result)
             logger.info(
-                "Loaded graph from SQLite: %d nodes, %d edges",
+                "Loaded graph from Kuzu: %d nodes, %d edges",
                 len(nodes),
                 len(edges),
             )
         else:
-            # DB exists but is empty — fall through to full build
+            logger.info(
+                "Graph store empty — scanning repository (large trees can take several minutes; "
+                "run `codegraph-mcp analyze` first for a faster cold start)."
+            )
             _full_build(repo_path)
     else:
         # ---------- cold path: full repo scan ----------
+        logger.info(
+            "No graph store yet — scanning repository (large trees can take several minutes; "
+            "run `codegraph-mcp analyze` first for a faster cold start)."
+        )
         _full_build(repo_path)
 
-    _engine = QueryEngine(_builder.graph, _builder._node_index)
+    _engine = QueryEngine(_builder.graph, _builder._node_index, fts_store=_store)
     logger.info("CodeGraph ready.")
 
     if graph_ui:
@@ -180,7 +213,7 @@ def initialize(repo_path: str, db_path: str = "codegraph.db", *, graph_ui: bool 
 
 
 def _full_build(repo_path: str) -> None:
-    """Scan *repo_path*, build the graph, and write nodes and edges to SQLite.
+    """Scan *repo_path*, build the graph, and write nodes and edges to Kuzu.
 
     Expects global ``_builder`` and ``_store`` to be set by ``initialize``.
     """
@@ -190,8 +223,11 @@ def _full_build(repo_path: str) -> None:
     builder, store = _builder, _store
     repo = Path(repo_path).resolve()
     builder.build_from_repository(repo)
-    store.save_nodes(builder.all_nodes())
-    store.save_edges(builder.all_edges())
+    store.save_graph(builder.all_nodes(), builder.all_edges())
+    if _store_path is not None:
+        from codegraph_mcp.semantic.build import maybe_build_semantic_index
+
+        maybe_build_semantic_index(_store_path, builder.all_nodes())
 
 
 def _require_engine() -> QueryEngine:
@@ -256,3 +292,48 @@ def architecture_summary() -> str:
     engine = _require_engine()
     summary = engine.architecture_summary()
     return summary.model_dump_json()
+
+
+@mcp.tool()
+def search_nodes_semantic(query: str, node_type: str | None = None, limit: int = 20) -> str:
+    """Semantic search over nodes using the optional vector index (cosine similarity).
+
+    Requires ``pip install codegraph-mcp[semantic]``, a built index (see README),
+    and embedding configuration (local model or OpenAI-compatible API).
+    """
+    engine = _require_engine()
+    if _store_path is None:
+        return json.dumps([])
+    try:
+        from codegraph_mcp.semantic.embeddings import describe_embedding_backend, get_backend_from_env
+        from codegraph_mcp.semantic.vector_index import search as semantic_search
+        from codegraph_mcp.semantic.vector_index import vector_index_path_for_store
+    except ImportError as e:
+        return json.dumps(
+            {"error": "semantic extra not installed", "hint": "pip install codegraph-mcp[semantic]", "detail": str(e)}
+        )
+    vpath = vector_index_path_for_store(_store_path)
+    if not vpath.is_file():
+        return json.dumps(
+            {
+                "error": "no vector index",
+                "hint": "Set CODEGRAPH_BUILD_SEMANTIC_INDEX=1 and re-analyze, or run analyze with semantic index build",
+            }
+        )
+    nt = NodeType(node_type) if node_type else None
+    backend = get_backend_from_env()
+    logger.info("search_nodes_semantic: embedding query via %s", describe_embedding_backend(backend))
+    qvec = backend.embed([query])[0]
+    pairs = semantic_search(
+        _store_path,
+        qvec,
+        engine.node_index,
+        node_type=nt,
+        limit=limit,
+    )
+    out = []
+    for node, score in pairs:
+        d = node.model_dump()
+        d["_score"] = score
+        out.append(d)
+    return json.dumps(out, default=str)

@@ -9,9 +9,9 @@ COPY sample_repo/ sample_repo/
 RUN pip install --no-cache-dir .
 
 ENV REPO_PATH=/app
-ENV PORT=8080
+ENV PORT=3847
 ENV MCP_TRANSPORT=streamable-http
 
-EXPOSE 8080
+EXPOSE 3847
 
 CMD ["python", "-m", "codegraph_mcp", "serve", "/app", "--transport", "streamable-http"]

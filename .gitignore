@@ -8,6 +8,9 @@ build/
 venv/
 *.db
 *.sqlite
+*.kuzu
+*.vectors.npz
+*.embeddings.json
 .pytest_cache/
 test_out.log
 smoke_out.log

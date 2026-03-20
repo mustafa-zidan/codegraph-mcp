@@ -17,9 +17,13 @@ dependencies = [
     "tree-sitter-typescript>=0.23.0",
     "tree-sitter-java>=0.23.0",
     "tree-sitter-kotlin>=1.1.0",
+    "kuzu>=0.11.3",
 ]
 
 [project.optional-dependencies]
+semantic = [
+    "numpy>=1.26",
+]
 dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.24",
@@ -68,5 +72,7 @@ module = [
     "tree_sitter_typescript.*",
     "tree_sitter_java.*",
     "tree_sitter_kotlin.*",
+    "kuzu.*",
+    "numpy.*",
 ]
 ignore_missing_imports = true

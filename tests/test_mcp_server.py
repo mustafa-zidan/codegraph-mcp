@@ -18,13 +18,15 @@ from codegraph_mcp.server.mcp_server import (
 @pytest.fixture(autouse=True)
 def _init_server(sample_repo_dir: Path, tmp_path: Path):
     """Initialize the MCP server before each test, and close the store after."""
-    db = str(tmp_path / "test.db")
+    db = str(tmp_path / "test.kuzu")
     initialize(str(sample_repo_dir), db)
     yield
-    # Close the SQLite connection so the temp dir can be cleaned up on Windows
     if mcp_server._store is not None:
         mcp_server._store.close()
         mcp_server._store = None
+    mcp_server._store_path = None
+    mcp_server._builder = None
+    mcp_server._engine = None
 
 
 class TestMCPServer:
