@@ -2,10 +2,10 @@
 
 from pathlib import Path
 
-from codegraph_mcp.parser.typescript import TypeScriptParser
+from codegraph_mcp.enums import EdgeType, NodeType
 from codegraph_mcp.parser.java import JavaParser
 from codegraph_mcp.parser.kotlin import KotlinParser
-from codegraph_mcp.enums import NodeType, EdgeType
+from codegraph_mcp.parser.typescript import TypeScriptParser
 
 
 class TestTypeScriptParser:

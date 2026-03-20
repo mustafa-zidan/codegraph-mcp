@@ -6,11 +6,12 @@ import logging
 from pathlib import Path
 
 import tree_sitter_kotlin as ts_kotlin
-from tree_sitter import Language, Parser, Node as TSNode
+from tree_sitter import Language, Parser
+from tree_sitter import Node as TSNode
 
-from ..enums import EdgeType, NodeType
-from ..models import Edge, Node
-from .base import BaseParser, ParseResult
+from codegraph_mcp.enums import EdgeType, NodeType
+from codegraph_mcp.models import Edge, Node
+from codegraph_mcp.parser.base import BaseParser, ParseResult, utf8_node_text
 
 logger = logging.getLogger("codegraph_mcp.parser.kotlin")
 
@@ -35,13 +36,15 @@ class KotlinParser(BaseParser):
             return result
 
         file_id = self._make_id("file", str(path))
-        result.add_node(Node(
-            id=file_id,
-            type=NodeType.FILE,
-            name=path.name,
-            file=str(path),
-            language=self.language,
-        ))
+        result.add_node(
+            Node(
+                id=file_id,
+                type=NodeType.FILE,
+                name=path.name,
+                file=str(path),
+                language=self.language,
+            )
+        )
 
         self._walk(tree.root_node, path, module_name, file_id, result)
         return result
@@ -72,18 +75,29 @@ class KotlinParser(BaseParser):
             self._walk(child, path, module_name, file_id, result)
 
     def _handle_import(
-        self, node: TSNode, file_id: str, result: ParseResult,
+        self,
+        node: TSNode,
+        file_id: str,
+        result: ParseResult,
     ) -> None:
         for child in node.children:
             if child.type == "qualified_identifier":
-                import_path = child.text.decode("utf-8")
+                import_path = utf8_node_text(child)
                 target_id = self._make_id("module", import_path)
-                result.add_node(Node(
-                    id=target_id, type=NodeType.MODULE, name=import_path,
-                ))
-                result.add_edge(Edge(
-                    source=file_id, target=target_id, type=EdgeType.IMPORTS,
-                ))
+                result.add_node(
+                    Node(
+                        id=target_id,
+                        type=NodeType.MODULE,
+                        name=import_path,
+                    )
+                )
+                result.add_edge(
+                    Edge(
+                        source=file_id,
+                        target=target_id,
+                        type=EdgeType.IMPORTS,
+                    )
+                )
                 break
 
     def _handle_function(
@@ -97,18 +111,24 @@ class KotlinParser(BaseParser):
         name_node = node.child_by_field_name("name")
         if name_node is None:
             return
-        func_name = name_node.text.decode("utf-8")
+        func_name = utf8_node_text(name_node)
         func_id = self._make_id("function", module_name, func_name)
-        result.add_node(Node(
-            id=func_id,
-            type=NodeType.FUNCTION,
-            name=func_name,
-            file=str(path),
-            language=self.language,
-        ))
-        result.add_edge(Edge(
-            source=file_id, target=func_id, type=EdgeType.DEFINES,
-        ))
+        result.add_node(
+            Node(
+                id=func_id,
+                type=NodeType.FUNCTION,
+                name=func_name,
+                file=str(path),
+                language=self.language,
+            )
+        )
+        result.add_edge(
+            Edge(
+                source=file_id,
+                target=func_id,
+                type=EdgeType.DEFINES,
+            )
+        )
 
     def _handle_class(
         self,
@@ -121,18 +141,24 @@ class KotlinParser(BaseParser):
         name_node = node.child_by_field_name("name")
         if name_node is None:
             return
-        class_name = name_node.text.decode("utf-8")
+        class_name = utf8_node_text(name_node)
         class_id = self._make_id("class", module_name, class_name)
-        result.add_node(Node(
-            id=class_id,
-            type=NodeType.CLASS,
-            name=class_name,
-            file=str(path),
-            language=self.language,
-        ))
-        result.add_edge(Edge(
-            source=file_id, target=class_id, type=EdgeType.DEFINES,
-        ))
+        result.add_node(
+            Node(
+                id=class_id,
+                type=NodeType.CLASS,
+                name=class_name,
+                file=str(path),
+                language=self.language,
+            )
+        )
+        result.add_edge(
+            Edge(
+                source=file_id,
+                target=class_id,
+                type=EdgeType.DEFINES,
+            )
+        )
 
     def _handle_object(
         self,
@@ -146,21 +172,30 @@ class KotlinParser(BaseParser):
         name_node = node.child_by_field_name("name")
         if name_node is None:
             return
-        obj_name = name_node.text.decode("utf-8")
+        obj_name = utf8_node_text(name_node)
         class_id = self._make_id("class", module_name, obj_name)
-        result.add_node(Node(
-            id=class_id,
-            type=NodeType.CLASS,
-            name=obj_name,
-            file=str(path),
-            language=self.language,
-        ))
-        result.add_edge(Edge(
-            source=file_id, target=class_id, type=EdgeType.DEFINES,
-        ))
+        result.add_node(
+            Node(
+                id=class_id,
+                type=NodeType.CLASS,
+                name=obj_name,
+                file=str(path),
+                language=self.language,
+            )
+        )
+        result.add_edge(
+            Edge(
+                source=file_id,
+                target=class_id,
+                type=EdgeType.DEFINES,
+            )
+        )
 
     def _handle_call(
-        self, node: TSNode, file_id: str, result: ParseResult,
+        self,
+        node: TSNode,
+        file_id: str,
+        result: ParseResult,
     ) -> None:
         if not node.children:
             return
@@ -169,19 +204,23 @@ class KotlinParser(BaseParser):
         if callee is None:
             return
         callee_id = self._make_id("function", callee)
-        result.add_edge(Edge(
-            source=file_id, target=callee_id, type=EdgeType.CALLS,
-        ))
+        result.add_edge(
+            Edge(
+                source=file_id,
+                target=callee_id,
+                type=EdgeType.CALLS,
+            )
+        )
 
     @staticmethod
     def _callee_name(node: TSNode) -> str | None:
         """Best-effort callee identifier (mirrors Java/TS name-only resolution)."""
         if node.type == "identifier":
-            return node.text.decode("utf-8")
+            return utf8_node_text(node)
         if node.type == "navigation_expression":
             for child in reversed(node.children):
                 if child.type == "identifier":
-                    return child.text.decode("utf-8")
+                    return utf8_node_text(child)
         if node.type == "call_expression":
             return KotlinParser._callee_name(node.children[0]) if node.children else None
-        return node.text.decode("utf-8")[:200] or None
+        return utf8_node_text(node)[:200] or None

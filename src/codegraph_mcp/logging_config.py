@@ -1,5 +1,7 @@
 """Structured logging configuration for CodeGraph MCP."""
 
+from __future__ import annotations
+
 import logging
 import sys
 

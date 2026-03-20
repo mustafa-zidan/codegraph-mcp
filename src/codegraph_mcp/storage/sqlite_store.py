@@ -6,10 +6,9 @@ import json
 import logging
 import sqlite3
 from pathlib import Path
-from typing import Iterator
 
-from ..enums import EdgeType, NodeType
-from ..models import Edge, Node
+from codegraph_mcp.enums import EdgeType, NodeType
+from codegraph_mcp.models import Edge, Node
 
 logger = logging.getLogger("codegraph_mcp.storage")
 
@@ -51,12 +50,8 @@ class SQLiteStore:
     def save_nodes(self, nodes: list[Node]) -> None:
         """Upsert a batch of nodes."""
         self._conn.executemany(
-            "INSERT OR REPLACE INTO nodes (id, type, name, file, language, metadata) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
-            [
-                (n.id, n.type.value, n.name, n.file, n.language, json.dumps(n.metadata))
-                for n in nodes
-            ],
+            "INSERT OR REPLACE INTO nodes (id, type, name, file, language, metadata) VALUES (?, ?, ?, ?, ?, ?)",
+            [(n.id, n.type.value, n.name, n.file, n.language, json.dumps(n.metadata)) for n in nodes],
         )
         self._conn.commit()
         logger.info("Saved %d nodes", len(nodes))
@@ -79,8 +74,11 @@ class SQLiteStore:
         rows = self._conn.execute("SELECT id, type, name, file, language, metadata FROM nodes").fetchall()
         return [
             Node(
-                id=r[0], type=NodeType(r[1]), name=r[2],
-                file=r[3], language=r[4],
+                id=r[0],
+                type=NodeType(r[1]),
+                name=r[2],
+                file=r[3],
+                language=r[4],
                 metadata=json.loads(r[5]) if r[5] else {},
             )
             for r in rows
@@ -89,10 +87,7 @@ class SQLiteStore:
     def load_edges(self) -> list[Edge]:
         """Load all edges from the database."""
         rows = self._conn.execute("SELECT source, target, type FROM edges").fetchall()
-        return [
-            Edge(source=r[0], target=r[1], type=EdgeType(r[2]))
-            for r in rows
-        ]
+        return [Edge(source=r[0], target=r[1], type=EdgeType(r[2])) for r in rows]
 
     # ------------------------------------------------------------------
 
@@ -102,4 +97,5 @@ class SQLiteStore:
         self._conn.commit()
 
     def close(self) -> None:
+        """Close the underlying SQLite connection."""
         self._conn.close()

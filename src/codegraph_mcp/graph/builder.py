@@ -5,17 +5,19 @@ from __future__ import annotations
 import logging
 import time
 from pathlib import Path
-from typing import Iterable
 
 import networkx as nx
 
-from ..enums import EdgeType, NodeType
-from ..models import Edge, Node
-from ..parser.base import BaseParser, ParseResult
-from ..parser.typescript import TypeScriptParser
-from ..parser.java import JavaParser
-from ..parser.kotlin import KotlinParser
-from ..utils.scanner import SUPPORTED_EXTENSIONS, detect_language, scan_repository
+from codegraph_mcp.enums import EdgeType, NodeType
+from codegraph_mcp.models import Edge, Node
+from codegraph_mcp.parser.base import BaseParser, ParseResult
+from codegraph_mcp.parser.java import JavaParser
+from codegraph_mcp.parser.kotlin import KotlinParser
+from codegraph_mcp.parser.typescript import TypeScriptParser
+from codegraph_mcp.utils.scanner import (
+    detect_language,
+    scan_repository,
+)
 
 logger = logging.getLogger("codegraph_mcp.graph.builder")
 
@@ -44,9 +46,13 @@ class GraphBuilder:
 
         # Repository root node
         repo_id = f"repository:{repo_path.name}"
-        self._add_node(Node(
-            id=repo_id, type=NodeType.REPOSITORY, name=repo_path.name,
-        ))
+        self._add_node(
+            Node(
+                id=repo_id,
+                type=NodeType.REPOSITORY,
+                name=repo_path.name,
+            )
+        )
 
         for source_file in scan_repository(repo_path):
             self._process_file(source_file, repo_id)
@@ -72,12 +78,15 @@ class GraphBuilder:
     # ------------------------------------------------------------------
 
     def get_node(self, node_id: str) -> Node | None:
+        """Return the parsed ``Node`` for *node_id*, or ``None`` if unknown."""
         return self._node_index.get(node_id)
 
     def all_nodes(self) -> list[Node]:
+        """Return every node currently in the index (order not guaranteed)."""
         return list(self._node_index.values())
 
     def all_edges(self) -> list[Edge]:
+        """Return all edges in the graph, with types taken from edge attributes."""
         edges: list[Edge] = []
         for u, v, data in self.graph.edges(data=True):
             edges.append(Edge(source=u, target=v, type=data.get("type", EdgeType.DEPENDS_ON)))
@@ -88,6 +97,7 @@ class GraphBuilder:
     # ------------------------------------------------------------------
 
     def _process_file(self, path: Path, repo_id: str) -> None:
+        """Parse *path* if supported and wire its file node to *repo_id*."""
         language = detect_language(path)
         if language is None:
             return
@@ -109,16 +119,22 @@ class GraphBuilder:
         # Link file node to repository
         for node in result.nodes:
             if node.type == NodeType.FILE:
-                self._add_edge(Edge(
-                    source=repo_id, target=node.id, type=EdgeType.DEPENDS_ON,
-                ))
+                self._add_edge(
+                    Edge(
+                        source=repo_id,
+                        target=node.id,
+                        type=EdgeType.DEPENDS_ON,
+                    )
+                )
 
     def _add_node(self, node: Node) -> None:
+        """Insert *node* into the index and NetworkX graph (first write wins)."""
         if node.id not in self._node_index:
             self._node_index[node.id] = node
             self.graph.add_node(node.id, **node.model_dump())
 
     def _add_edge(self, edge: Edge) -> None:
+        """Add *edge*; create stub endpoints if missing so NetworkX stays consistent."""
         # Ensure both endpoints exist as graph nodes (at minimum as stubs)
         for nid in (edge.source, edge.target):
             if nid not in self.graph:

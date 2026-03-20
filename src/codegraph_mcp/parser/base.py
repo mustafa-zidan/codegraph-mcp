@@ -6,9 +6,19 @@ import logging
 from abc import ABC, abstractmethod
 from pathlib import Path
 
-from ..models import Edge, Node
+from tree_sitter import Node as TSNode
+
+from codegraph_mcp.models import Edge, Node
 
 logger = logging.getLogger("codegraph_mcp.parser")
+
+
+def utf8_node_text(node: TSNode) -> str:
+    """Return UTF-8 text for a tree-sitter node, or empty string if absent."""
+    raw = node.text
+    if raw is None:
+        return ""
+    return raw.decode("utf-8")
 
 
 class ParseResult:
@@ -17,13 +27,16 @@ class ParseResult:
     __slots__ = ("nodes", "edges")
 
     def __init__(self) -> None:
+        """Create empty node and edge lists."""
         self.nodes: list[Node] = []
         self.edges: list[Edge] = []
 
     def add_node(self, node: Node) -> None:
+        """Append *node* to the result list."""
         self.nodes.append(node)
 
     def add_edge(self, edge: Edge) -> None:
+        """Append *edge* to the result list."""
         self.edges.append(edge)
 
 

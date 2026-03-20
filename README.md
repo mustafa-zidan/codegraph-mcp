@@ -153,10 +153,51 @@ fly deploy
 
 ## Development
 
+Install with dev extras (e.g. [uv](https://docs.astral.sh/uv/) or pip):
+
 ```bash
-pip install -e ".[dev]"
+uv sync --extra dev
+# or: pip install -e ".[dev]"
+```
+
+Lint and format:
+
+```bash
+ruff check src tests
+ruff format src tests
+```
+
+Static typing:
+
+```bash
+mypy src
+```
+
+Tests:
+
+```bash
 pytest tests/ -v
 ```
+
+Optional [pre-commit](https://pre-commit.com/) hooks (Ruff lint + format on commit):
+
+```bash
+pip install pre-commit
+pre-commit install
+```
+
+## CI and PyPI releases
+
+[`.github/workflows/test.yml`](.github/workflows/test.yml) runs on push/PR to `main`, `master`, or `develop`: `uv sync --extra dev`, Ruff, Mypy, and pytest (matrix: Ubuntu / macOS / Windows × Python 3.10 / 3.12 / 3.13).
+
+To publish **[codegraph-mcp on PyPI](https://pypi.org/p/codegraph-mcp)**:
+
+1. Bump `version` in [`pyproject.toml`](pyproject.toml) and update [`CHANGELOG.md`](CHANGELOG.md) for that version, merge to your default branch.
+2. In PyPI → your project → **Settings** → **Publishing**, add a **trusted publisher** for this GitHub repo (workflow: `release.yml`, environment: `pypi`).
+3. In GitHub → **Settings** → **Environments**, create an environment named `pypi` (optionally add protection rules).
+4. Run **Actions** → **Release** → **Run workflow**, enter the same version string as in `pyproject.toml`.
+
+The workflow creates an annotated tag `vX.Y.Z`, runs `uv build`, publishes with [OIDC](https://docs.pypi.org/trusted-publishers/), signs artifacts with Sigstore, and creates a GitHub Release. Inspired by the [eurydice](https://github.com/mustafa-zidan/eurydice) test/release workflows.
 
 ## License
 

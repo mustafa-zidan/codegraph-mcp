@@ -23,6 +23,9 @@ dependencies = [
 dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.24",
+    "ruff>=0.9",
+    "mypy>=1.14",
+    "types-networkx>=3.6.1.20260303",
 ]
 
 [project.scripts]
@@ -30,3 +33,38 @@ codegraph-mcp = "codegraph_mcp.__main__:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 120
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["codegraph_mcp"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.mypy]
+python_version = "3.10"
+mypy_path = "src"
+packages = ["codegraph_mcp"]
+warn_return_any = false
+warn_unused_configs = true
+disallow_untyped_defs = false
+check_untyped_defs = true
+
+[[tool.mypy.overrides]]
+module = [
+    "tree_sitter.*",
+    "tree_sitter_typescript.*",
+    "tree_sitter_java.*",
+    "tree_sitter_kotlin.*",
+]
+ignore_missing_imports = true

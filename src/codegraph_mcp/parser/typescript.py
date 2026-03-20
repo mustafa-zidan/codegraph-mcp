@@ -6,11 +6,12 @@ import logging
 from pathlib import Path
 
 import tree_sitter_typescript as ts_ts
-from tree_sitter import Language, Parser, Node as TSNode
+from tree_sitter import Language, Parser
+from tree_sitter import Node as TSNode
 
-from ..enums import EdgeType, NodeType
-from ..models import Edge, Node
-from .base import BaseParser, ParseResult
+from codegraph_mcp.enums import EdgeType, NodeType
+from codegraph_mcp.models import Edge, Node
+from codegraph_mcp.parser.base import BaseParser, ParseResult, utf8_node_text
 
 logger = logging.getLogger("codegraph_mcp.parser.typescript")
 
@@ -38,13 +39,15 @@ class TypeScriptParser(BaseParser):
 
         # File node
         file_id = self._make_id("file", str(path))
-        result.add_node(Node(
-            id=file_id,
-            type=NodeType.FILE,
-            name=path.name,
-            file=str(path),
-            language=self.language,
-        ))
+        result.add_node(
+            Node(
+                id=file_id,
+                type=NodeType.FILE,
+                name=path.name,
+                file=str(path),
+                language=self.language,
+            )
+        )
 
         self._walk(tree.root_node, path, module_name, file_id, result)
         return result
@@ -65,8 +68,7 @@ class TypeScriptParser(BaseParser):
         try:
             if node.type == "import_statement":
                 self._handle_import(node, path, file_id, result)
-            elif node.type in ("function_declaration", "arrow_function",
-                               "method_definition"):
+            elif node.type in ("function_declaration", "arrow_function", "method_definition"):
                 self._handle_function(node, path, module_name, file_id, result)
             elif node.type == "class_declaration":
                 self._handle_class(node, path, module_name, file_id, result)
@@ -81,19 +83,31 @@ class TypeScriptParser(BaseParser):
     # --- handlers ---
 
     def _handle_import(
-        self, node: TSNode, path: Path, file_id: str, result: ParseResult,
+        self,
+        node: TSNode,
+        path: Path,
+        file_id: str,
+        result: ParseResult,
     ) -> None:
         source_node = node.child_by_field_name("source")
         if source_node is None:
             return
-        import_path = source_node.text.decode("utf-8").strip("'\"")
+        import_path = utf8_node_text(source_node).strip("'\"")
         target_id = self._make_id("module", import_path)
-        result.add_node(Node(
-            id=target_id, type=NodeType.MODULE, name=import_path,
-        ))
-        result.add_edge(Edge(
-            source=file_id, target=target_id, type=EdgeType.IMPORTS,
-        ))
+        result.add_node(
+            Node(
+                id=target_id,
+                type=NodeType.MODULE,
+                name=import_path,
+            )
+        )
+        result.add_edge(
+            Edge(
+                source=file_id,
+                target=target_id,
+                type=EdgeType.IMPORTS,
+            )
+        )
 
     def _handle_function(
         self,
@@ -106,18 +120,24 @@ class TypeScriptParser(BaseParser):
         name_node = node.child_by_field_name("name")
         if name_node is None:
             return
-        func_name = name_node.text.decode("utf-8")
+        func_name = utf8_node_text(name_node)
         func_id = self._make_id("function", module_name, func_name)
-        result.add_node(Node(
-            id=func_id,
-            type=NodeType.FUNCTION,
-            name=func_name,
-            file=str(path),
-            language=self.language,
-        ))
-        result.add_edge(Edge(
-            source=file_id, target=func_id, type=EdgeType.DEFINES,
-        ))
+        result.add_node(
+            Node(
+                id=func_id,
+                type=NodeType.FUNCTION,
+                name=func_name,
+                file=str(path),
+                language=self.language,
+            )
+        )
+        result.add_edge(
+            Edge(
+                source=file_id,
+                target=func_id,
+                type=EdgeType.DEFINES,
+            )
+        )
 
     def _handle_class(
         self,
@@ -130,18 +150,24 @@ class TypeScriptParser(BaseParser):
         name_node = node.child_by_field_name("name")
         if name_node is None:
             return
-        class_name = name_node.text.decode("utf-8")
+        class_name = utf8_node_text(name_node)
         class_id = self._make_id("class", module_name, class_name)
-        result.add_node(Node(
-            id=class_id,
-            type=NodeType.CLASS,
-            name=class_name,
-            file=str(path),
-            language=self.language,
-        ))
-        result.add_edge(Edge(
-            source=file_id, target=class_id, type=EdgeType.DEFINES,
-        ))
+        result.add_node(
+            Node(
+                id=class_id,
+                type=NodeType.CLASS,
+                name=class_name,
+                file=str(path),
+                language=self.language,
+            )
+        )
+        result.add_edge(
+            Edge(
+                source=file_id,
+                target=class_id,
+                type=EdgeType.DEFINES,
+            )
+        )
 
     def _handle_call(
         self,
@@ -154,9 +180,13 @@ class TypeScriptParser(BaseParser):
         fn_node = node.child_by_field_name("function")
         if fn_node is None:
             return
-        callee = fn_node.text.decode("utf-8")
+        callee = utf8_node_text(fn_node)
         callee_id = self._make_id("function", callee)
         # We create a CALLS edge from the file to the callee
-        result.add_edge(Edge(
-            source=file_id, target=callee_id, type=EdgeType.CALLS,
-        ))
+        result.add_edge(
+            Edge(
+                source=file_id,
+                target=callee_id,
+                type=EdgeType.CALLS,
+            )
+        )

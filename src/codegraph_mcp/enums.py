@@ -5,6 +5,7 @@ from enum import Enum
 
 class NodeType(str, Enum):
     """Types of nodes in the code knowledge graph."""
+
     REPOSITORY = "repository"
     MODULE = "module"
     FILE = "file"
@@ -16,6 +17,7 @@ class NodeType(str, Enum):
 
 class EdgeType(str, Enum):
     """Types of edges (relationships) in the code knowledge graph."""
+
     IMPORTS = "imports"
     CALLS = "calls"
     DEFINES = "defines"

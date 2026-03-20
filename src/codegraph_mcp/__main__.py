@@ -12,13 +12,13 @@ import argparse
 import json
 import logging
 import os
-import sys
 from pathlib import Path
+from typing import Literal, cast
 
-from .logging_config import setup_logging
-from .graph.builder import GraphBuilder
-from .graph.query_engine import QueryEngine
-from .storage.sqlite_store import SQLiteStore
+from codegraph_mcp.graph.builder import GraphBuilder
+from codegraph_mcp.graph.query_engine import QueryEngine
+from codegraph_mcp.logging_config import setup_logging
+from codegraph_mcp.storage.sqlite_store import SQLiteStore
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -31,26 +31,25 @@ def main(argv: list[str] | None = None) -> None:
 
     # ---- analyze ----
     p_analyze = sub.add_parser("analyze", help="Analyze a repository and print summary")
-    p_analyze.add_argument("repo", type=Path, nargs="?",
-                           default=Path(os.environ.get("REPO_PATH", ".")),
-                           help="Path to the repository root")
-    p_analyze.add_argument("--db", type=str, default="codegraph.db",
-                           help="SQLite database path")
+    p_analyze.add_argument(
+        "repo", type=Path, nargs="?", default=Path(os.environ.get("REPO_PATH", ".")), help="Path to the repository root"
+    )
+    p_analyze.add_argument("--db", type=str, default="codegraph.db", help="SQLite database path")
 
     # ---- serve ----
     p_serve = sub.add_parser("serve", help="Start the MCP server")
-    p_serve.add_argument("repo", type=Path, nargs="?",
-                         default=Path(os.environ.get("REPO_PATH", ".")),
-                         help="Path to the repository root")
-    p_serve.add_argument("--db", type=str, default="codegraph.db",
-                         help="SQLite database path")
-    p_serve.add_argument("--transport", type=str,
-                         default=os.environ.get("MCP_TRANSPORT", "stdio"),
-                         choices=["stdio", "sse", "streamable-http"],
-                         help="MCP transport: stdio (local), sse, or streamable-http (remote)")
-    p_serve.add_argument("--port", type=int,
-                         default=int(os.environ.get("PORT", "8080")),
-                         help="Port for SSE transport")
+    p_serve.add_argument(
+        "repo", type=Path, nargs="?", default=Path(os.environ.get("REPO_PATH", ".")), help="Path to the repository root"
+    )
+    p_serve.add_argument("--db", type=str, default="codegraph.db", help="SQLite database path")
+    p_serve.add_argument(
+        "--transport",
+        type=str,
+        default=os.environ.get("MCP_TRANSPORT", "stdio"),
+        choices=["stdio", "sse", "streamable-http"],
+        help="MCP transport: stdio (local), sse, or streamable-http (remote)",
+    )
+    p_serve.add_argument("--port", type=int, default=int(os.environ.get("PORT", "8080")), help="Port for SSE transport")
     p_serve.add_argument(
         "--graph-ui",
         action="store_true",
@@ -63,7 +62,9 @@ def main(argv: list[str] | None = None) -> None:
         _run_analyze(args.repo, args.db)
     elif args.command == "serve":
         graph_ui_flag = args.graph_ui or os.environ.get("GRAPH_UI", "").strip().lower() in (
-            "1", "true", "yes",
+            "1",
+            "true",
+            "yes",
         )
         _run_serve(args.repo, args.db, args.transport, args.port, graph_ui=graph_ui_flag)
 
@@ -90,7 +91,7 @@ def _run_serve(
     *,
     graph_ui: bool = False,
 ) -> None:
-    from .server.mcp_server import initialize, mcp
+    from codegraph_mcp.server.mcp_server import initialize, mcp
 
     log = logging.getLogger("codegraph_mcp")
     graph_ui_effective = graph_ui and transport != "stdio"
@@ -107,4 +108,4 @@ def _run_serve(
     os.environ["FASTMCP_PORT"] = str(port)
 
     # Let FastMCP handle server startup
-    mcp.run(transport=transport)
+    mcp.run(transport=cast(Literal["stdio", "sse", "streamable-http"], transport))

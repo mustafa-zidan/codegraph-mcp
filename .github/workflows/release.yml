@@ -1,0 +1,132 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release (e.g., 0.1.0, 0.2.0-beta.1)"
+        required: true
+        type: string
+      prerelease:
+        description: "Is this a pre-release?"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/codegraph-mcp
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate version format
+        run: |
+          if ! echo "${{ inputs.version }}" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$'; then
+            echo "Invalid version format. Use semantic versioning (e.g., 0.1.0, 0.2.0-beta.1)"
+            exit 1
+          fi
+
+      - name: Verify pyproject.toml version matches release
+        run: |
+          python - <<'PY'
+          import tomllib
+          from pathlib import Path
+          data = tomllib.loads(Path("pyproject.toml").read_text())
+          current = data["project"]["version"]
+          want = "${{ inputs.version }}"
+          if current != want:
+              raise SystemExit(
+                  f"pyproject.toml version is {current!r}, expected {want!r}. "
+                  "Merge a version bump on the default branch before running this workflow."
+              )
+          PY
+
+      - name: Check if tag exists
+        run: |
+          if git rev-parse "v${{ inputs.version }}" >/dev/null 2>&1; then
+            echo "Tag v${{ inputs.version }} already exists!"
+            exit 1
+          fi
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Create and push tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "v${{ inputs.version }}" -m "Release v${{ inputs.version }}"
+          git push origin "v${{ inputs.version }}"
+
+      - name: Build package
+        run: uv build
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+
+      - name: Generate release notes
+        id: release_notes
+        run: |
+          VERSION="${{ inputs.version }}"
+          VER_REGEX="${VERSION//./\\.}"
+
+          if [ -f CHANGELOG.md ]; then
+            NOTES=$(awk -v ver="$VER_REGEX" '
+              /^## / && found { exit }
+              $0 ~ ("^## \\[" ver "\\]") { found=1; next }
+              found { print }
+            ' CHANGELOG.md)
+          else
+            NOTES=""
+          fi
+
+          if [ -z "$(printf '%s' "$NOTES" | tr -d '[:space:]')" ]; then
+            echo "::warning::No CHANGELOG.md entry found for v${VERSION}. Falling back to git log."
+            printf "## What is Changed\n\n" > release_notes.md
+            LAST_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+            if [ -n "$LAST_TAG" ]; then
+              git log --pretty=format:"- %s (%h)" "${LAST_TAG}..HEAD" >> release_notes.md
+            else
+              git log --pretty=format:"- %s (%h)" >> release_notes.md
+            fi
+          else
+            printf '%s\n' "$NOTES" > release_notes.md
+          fi
+
+          printf '\n## Installation\n\n```bash\npip install codegraph-mcp==%s\n```\n\nOr with uv:\n```bash\nuv add codegraph-mcp==%s\n```\n' \
+            "$VERSION" "$VERSION" >> release_notes.md
+
+      - name: Sign distributions with Sigstore
+        uses: sigstore/gh-action-sigstore-python@v3.2.0
+        with:
+          inputs: ./dist/*.tar.gz ./dist/*.whl
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ inputs.version }}
+          name: CodeGraph MCP v${{ inputs.version }}
+          body_path: release_notes.md
+          draft: false
+          prerelease: ${{ inputs.prerelease }}
+          files: |
+            dist/*.whl
+            dist/*.tar.gz
+            dist/*.sigstore
+            dist/*.bundle

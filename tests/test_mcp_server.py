@@ -1,20 +1,17 @@
 """Tests for the MCP server tool functions."""
 
 import json
-import tempfile
 from pathlib import Path
 
 import pytest
 
 from codegraph_mcp.server import mcp_server
 from codegraph_mcp.server.mcp_server import (
+    architecture_summary,
+    impact_analysis,
     initialize,
     search_nodes,
-    trace_dependencies,
-    trace_dependents,
-    impact_analysis,
     trace_path,
-    architecture_summary,
 )
 
 

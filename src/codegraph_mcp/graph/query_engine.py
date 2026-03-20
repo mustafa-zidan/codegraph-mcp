@@ -5,12 +5,11 @@ from __future__ import annotations
 import logging
 import time
 from collections import deque
-from typing import Any
 
 import networkx as nx
 
-from ..enums import EdgeType, NodeType
-from ..models import (
+from codegraph_mcp.enums import EdgeType, NodeType
+from codegraph_mcp.models import (
     ArchitectureSummary,
     Edge,
     GraphQuery,
@@ -49,8 +48,7 @@ class QueryEngine:
                 matches.append(node)
                 if len(matches) >= limit:
                     break
-        logger.info("search_nodes(%r) → %d results in %.3fs",
-                     query, len(matches), time.perf_counter() - start)
+        logger.info("search_nodes(%r) → %d results in %.3fs", query, len(matches), time.perf_counter() - start)
         return matches
 
     # ------------------------------------------------------------------
@@ -82,12 +80,15 @@ class QueryEngine:
         affected_ids = {n.id for n in affected} | {gq.node_id}
         for u, v, data in self._g.edges(data=True):
             if u in affected_ids and v in affected_ids:
-                affected_edges.append(Edge(
-                    source=u, target=v, type=data.get("type", EdgeType.DEPENDS_ON),
-                ))
+                affected_edges.append(
+                    Edge(
+                        source=u,
+                        target=v,
+                        type=data.get("type", EdgeType.DEPENDS_ON),
+                    )
+                )
 
-        logger.info("impact_analysis(%s) → %d nodes in %.3fs",
-                     gq.node_id, len(affected), time.perf_counter() - start)
+        logger.info("impact_analysis(%s) → %d nodes in %.3fs", gq.node_id, len(affected), time.perf_counter() - start)
         return ImpactResult(
             source_node=gq.node_id,
             affected_nodes=affected,
@@ -100,7 +101,11 @@ class QueryEngine:
     # ------------------------------------------------------------------
 
     def trace_path(self, source_id: str, target_id: str) -> list[Node]:
-        """Shortest path between two nodes (undirected traversal)."""
+        """Shortest path between *source_id* and *target_id* (undirected graph).
+
+        Only nodes present in the internal index are included; intermediate
+        graph ids without metadata are skipped.
+        """
         try:
             path_ids = nx.shortest_path(self._g.to_undirected(), source_id, target_id)
         except (nx.NetworkXNoPath, nx.NodeNotFound):
@@ -145,7 +150,11 @@ class QueryEngine:
     # ------------------------------------------------------------------
 
     def _bfs(
-        self, start: str, max_depth: int, *, successors: bool,
+        self,
+        start: str,
+        max_depth: int,
+        *,
+        successors: bool,
     ) -> list[Node]:
         """Generic BFS. *successors=True* traverses downstream, else upstream."""
         if start not in self._g:
@@ -164,10 +173,7 @@ class QueryEngine:
             if current != start and current in self._nodes:
                 result.append(self._nodes[current])
 
-            neighbors = (
-                self._g.successors(current) if successors
-                else self._g.predecessors(current)
-            )
+            neighbors = self._g.successors(current) if successors else self._g.predecessors(current)
             for neighbor in neighbors:
                 if neighbor not in visited:
                     queue.append((neighbor, depth + 1))

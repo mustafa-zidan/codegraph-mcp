@@ -3,7 +3,7 @@
 import tempfile
 from pathlib import Path
 
-from codegraph_mcp.utils.scanner import scan_repository, detect_language
+from codegraph_mcp.utils.scanner import detect_language, scan_repository
 
 
 def test_scan_finds_ts_files():

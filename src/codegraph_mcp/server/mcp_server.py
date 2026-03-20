@@ -6,15 +6,18 @@ import json
 import logging
 import os
 from pathlib import Path
+from typing import Any
 
 from mcp.server.fastmcp import FastMCP
+from starlette.requests import Request
+from starlette.responses import HTMLResponse, JSONResponse
 
-from ..enums import NodeType
-from ..graph.builder import GraphBuilder
-from ..graph.query_engine import QueryEngine
-from ..models import GraphQuery
-from ..storage.sqlite_store import SQLiteStore
-from ..logging_config import setup_logging
+from codegraph_mcp.enums import NodeType
+from codegraph_mcp.graph.builder import GraphBuilder
+from codegraph_mcp.graph.query_engine import QueryEngine
+from codegraph_mcp.logging_config import setup_logging
+from codegraph_mcp.models import GraphQuery
+from codegraph_mcp.storage.sqlite_store import SQLiteStore
 
 logger = logging.getLogger("codegraph_mcp.server")
 
@@ -28,9 +31,9 @@ _graph_ui_routes_registered: bool = False
 
 mcp = FastMCP("CodeGraph MCP", host="0.0.0.0", port=int(os.environ.get("FASTMCP_PORT", os.environ.get("PORT", "8080"))))
 
+
 @mcp.custom_route("/health", methods=["GET"])
-async def health(request):
-    from starlette.responses import JSONResponse
+async def health(request: Request) -> JSONResponse:
     return JSONResponse({"status": "ok"})
 
 
@@ -41,10 +44,7 @@ def _register_graph_ui_routes() -> None:
         return
     _graph_ui_routes_registered = True
 
-    from starlette.responses import HTMLResponse, JSONResponse
-    from starlette.requests import Request
-
-    def _graph_payload(limit: int) -> dict:
+    def _graph_payload(limit: int) -> dict[str, Any]:
         if _builder is None:
             return {"nodes": [], "edges": [], "truncated": False, "error": "graph not initialized"}
         nodes_all = _builder.all_nodes()
@@ -52,18 +52,17 @@ def _register_graph_ui_routes() -> None:
         if truncated:
             nodes_all = nodes_all[:limit]
         allowed = {n.id for n in nodes_all}
-        nodes_out = [
-            {"id": n.id, "label": n.name, "group": n.type.value}
-            for n in nodes_all
-        ]
+        nodes_out = [{"id": n.id, "label": n.name, "group": n.type.value} for n in nodes_all]
         edges_out: list[dict] = []
         for e in _builder.all_edges():
             if e.source in allowed and e.target in allowed:
-                edges_out.append({
-                    "from": e.source,
-                    "to": e.target,
-                    "title": e.type.value,
-                })
+                edges_out.append(
+                    {
+                        "from": e.source,
+                        "to": e.target,
+                        "title": e.type.value,
+                    }
+                )
         return {"nodes": nodes_out, "edges": edges_out, "truncated": truncated}
 
     @mcp.custom_route("/api/graph", methods=["GET"])
@@ -155,8 +154,7 @@ def initialize(repo_path: str, db_path: str = "codegraph.db", *, graph_ui: bool 
         nodes = _store.load_nodes()
         edges = _store.load_edges()
         if nodes:
-            from ..models import Edge, Node
-            from ..parser.base import ParseResult
+            from codegraph_mcp.parser.base import ParseResult
 
             result = ParseResult()
             result.nodes = nodes
@@ -164,7 +162,8 @@ def initialize(repo_path: str, db_path: str = "codegraph.db", *, graph_ui: bool 
             _builder.add_parse_result(result)
             logger.info(
                 "Loaded graph from SQLite: %d nodes, %d edges",
-                len(nodes), len(edges),
+                len(nodes),
+                len(edges),
             )
         else:
             # DB exists but is empty — fall through to full build
@@ -181,14 +180,22 @@ def initialize(repo_path: str, db_path: str = "codegraph.db", *, graph_ui: bool 
 
 
 def _full_build(repo_path: str) -> None:
-    """Scan, parse, and persist the graph."""
+    """Scan *repo_path*, build the graph, and write nodes and edges to SQLite.
+
+    Expects global ``_builder`` and ``_store`` to be set by ``initialize``.
+    """
+    global _builder, _store
+    assert _builder is not None
+    assert _store is not None
+    builder, store = _builder, _store
     repo = Path(repo_path).resolve()
-    _builder.build_from_repository(repo)
-    _store.save_nodes(_builder.all_nodes())
-    _store.save_edges(_builder.all_edges())
+    builder.build_from_repository(repo)
+    store.save_nodes(builder.all_nodes())
+    store.save_edges(builder.all_edges())
 
 
 def _require_engine() -> QueryEngine:
+    """Return the shared query engine or raise if ``initialize`` has not run."""
     if _engine is None:
         raise RuntimeError("CodeGraph not initialized. Call `initialize(repo_path)` first.")
     return _engine
@@ -197,6 +204,7 @@ def _require_engine() -> QueryEngine:
 # ---------------------------------------------------------------------------
 # MCP tools
 # ---------------------------------------------------------------------------
+
 
 @mcp.tool()
 def search_nodes(query: str, node_type: str | None = None, limit: int = 50) -> str:
