@@ -11,7 +11,7 @@ Repository
    ↓
 File Scanner (lazy, generator-based)
    ↓
-Parser Layer (Tree-sitter: TypeScript, Java)
+Parser Layer (Tree-sitter: TypeScript, Java, Kotlin)
    ↓
 Graph Builder (NetworkX DiGraph)
    ↓
@@ -53,6 +53,19 @@ codegraph-mcp serve ./your-repo
 ```bash
 codegraph-mcp serve ./your-repo --transport streamable-http --port 8080
 ```
+
+### Optional graph viewer (HTTP transports only)
+
+When you use **SSE** or **streamable-http** (not `stdio`), you can expose a quick interactive graph in the browser:
+
+```bash
+codegraph-mcp serve ./your-repo --transport streamable-http --port 8080 --graph-ui
+```
+
+- Open `http://localhost:8080/graph` for a [vis-network](https://visjs.github.io/vis-network/docs/network/) view.
+- Raw JSON: `GET /api/graph` (optional query `limit`, default `500`; caps node count for responsiveness).
+
+`--graph-ui` is ignored for `stdio` (there is no HTTP server). You can also set `GRAPH_UI=1` instead of the flag.
 
 ## MCP Configuration
 
@@ -105,6 +118,7 @@ architecture_summary()
 
 - TypeScript / TSX
 - Java
+- Kotlin (`.kt`, `.kts`)
 
 ## Deployment
 
@@ -135,6 +149,7 @@ fly deploy
 | `REPO_PATH` | `.` | Path to the repository to analyze |
 | `PORT` | `8080` | Port for SSE transport |
 | `MCP_TRANSPORT` | `stdio` | Transport mode: `stdio`, `sse`, or `streamable-http` |
+| `GRAPH_UI` | unset | Set to `1` / `true` to enable `/graph` and `/api/graph` (same as `--graph-ui`; HTTP transports only) |
 
 ## Development
 

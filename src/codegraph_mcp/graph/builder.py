@@ -14,6 +14,7 @@ from ..models import Edge, Node
 from ..parser.base import BaseParser, ParseResult
 from ..parser.typescript import TypeScriptParser
 from ..parser.java import JavaParser
+from ..parser.kotlin import KotlinParser
 from ..utils.scanner import SUPPORTED_EXTENSIONS, detect_language, scan_repository
 
 logger = logging.getLogger("codegraph_mcp.graph.builder")
@@ -22,6 +23,7 @@ logger = logging.getLogger("codegraph_mcp.graph.builder")
 _PARSERS: dict[str, BaseParser] = {
     "typescript": TypeScriptParser(),
     "java": JavaParser(),
+    "kotlin": KotlinParser(),
 }
 
 

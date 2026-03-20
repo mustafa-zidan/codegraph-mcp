@@ -4,6 +4,7 @@ from pathlib import Path
 
 from codegraph_mcp.parser.typescript import TypeScriptParser
 from codegraph_mcp.parser.java import JavaParser
+from codegraph_mcp.parser.kotlin import KotlinParser
 from codegraph_mcp.enums import NodeType, EdgeType
 
 
@@ -57,3 +58,34 @@ class TestJavaParser:
         result = parser.parse_file(Path("Main.java"), sample_java_source)
         import_edges = [e for e in result.edges if e.type == EdgeType.IMPORTS]
         assert len(import_edges) >= 1
+
+
+class TestKotlinParser:
+    def test_extracts_function(self, sample_kotlin_source: bytes):
+        parser = KotlinParser()
+        result = parser.parse_file(Path("Greeting.kt"), sample_kotlin_source)
+        func_nodes = [n for n in result.nodes if n.type == NodeType.FUNCTION]
+        assert any(n.name == "greet" for n in func_nodes)
+        assert any(n.name == "format" for n in func_nodes)
+
+    def test_extracts_import(self, sample_kotlin_source: bytes):
+        parser = KotlinParser()
+        result = parser.parse_file(Path("Greeting.kt"), sample_kotlin_source)
+        import_edges = [e for e in result.edges if e.type == EdgeType.IMPORTS]
+        assert len(import_edges) >= 1
+
+    def test_extracts_class(self, sample_kotlin_source: bytes):
+        parser = KotlinParser()
+        result = parser.parse_file(Path("Greeting.kt"), sample_kotlin_source)
+        class_nodes = [n for n in result.nodes if n.type == NodeType.CLASS]
+        assert any(n.name == "Greeter" for n in class_nodes)
+
+    def test_handles_empty_source(self):
+        parser = KotlinParser()
+        result = parser.parse_file(Path("empty.kt"), b"")
+        assert len(result.nodes) >= 1  # at least the file node
+
+    def test_handles_malformed_source(self):
+        parser = KotlinParser()
+        result = parser.parse_file(Path("bad.kt"), b"}{}{fun <<<>>>")
+        assert isinstance(result.nodes, list)

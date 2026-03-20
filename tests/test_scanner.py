@@ -37,4 +37,6 @@ def test_detect_language():
     assert detect_language(Path("foo.ts")) == "typescript"
     assert detect_language(Path("foo.tsx")) == "typescript"
     assert detect_language(Path("Main.java")) == "java"
+    assert detect_language(Path("foo.kt")) == "kotlin"
+    assert detect_language(Path("build.gradle.kts")) == "kotlin"
     assert detect_language(Path("readme.md")) is None

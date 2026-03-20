@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import os
 import sys
 from pathlib import Path
@@ -50,13 +51,21 @@ def main(argv: list[str] | None = None) -> None:
     p_serve.add_argument("--port", type=int,
                          default=int(os.environ.get("PORT", "8080")),
                          help="Port for SSE transport")
+    p_serve.add_argument(
+        "--graph-ui",
+        action="store_true",
+        help="Expose GET /graph and /api/graph (HTTP transports only; not stdio)",
+    )
 
     args = parser.parse_args(argv)
 
     if args.command == "analyze":
         _run_analyze(args.repo, args.db)
     elif args.command == "serve":
-        _run_serve(args.repo, args.db, args.transport, args.port)
+        graph_ui_flag = args.graph_ui or os.environ.get("GRAPH_UI", "").strip().lower() in (
+            "1", "true", "yes",
+        )
+        _run_serve(args.repo, args.db, args.transport, args.port, graph_ui=graph_ui_flag)
 
 
 def _run_analyze(repo: Path, db_path: str) -> None:
@@ -73,11 +82,26 @@ def _run_analyze(repo: Path, db_path: str) -> None:
     print(json.dumps(summary.model_dump(), indent=2))
 
 
-def _run_serve(repo: Path, db_path: str, transport: str, port: int) -> None:
+def _run_serve(
+    repo: Path,
+    db_path: str,
+    transport: str,
+    port: int,
+    *,
+    graph_ui: bool = False,
+) -> None:
     from .server.mcp_server import initialize, mcp
 
+    log = logging.getLogger("codegraph_mcp")
+    graph_ui_effective = graph_ui and transport != "stdio"
+    if graph_ui and transport == "stdio":
+        log.warning(
+            "--graph-ui is ignored for stdio transport (no HTTP server). "
+            "Use --transport sse or streamable-http to enable /graph.",
+        )
+
     # Build or load the graph
-    initialize(str(repo), db_path)
+    initialize(str(repo), db_path, graph_ui=graph_ui_effective)
 
     os.environ["PORT"] = str(port)
     os.environ["FASTMCP_PORT"] = str(port)
